@@ -5,6 +5,7 @@ import gi
 
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk
+
 from ks_includes.screen_panel import ScreenPanel
 
 
@@ -17,15 +18,15 @@ class Panel(ScreenPanel):
         self.scales = {}
         self.labels = {}
         self.grid = Gtk.Grid(column_spacing=10, row_spacing=5)
+        self.backend = "Wayland" if screen.wayland else "XServer"
 
         self.sysinfo = screen.printer.system_info
         if not self.sysinfo:
             logging.debug("Asking for info")
             self.sysinfo = screen.apiclient.send_request("machine/system_info")
-            if 'system_info' in self.sysinfo:
-                screen.printer.system_info = self.sysinfo['system_info']
-                self.sysinfo = self.sysinfo['system_info']
-        logging.debug(self.sysinfo)
+            if "system_info" in self.sysinfo:
+                screen.printer.system_info = self.sysinfo["system_info"]
+                self.sysinfo = self.sysinfo["system_info"]
         if self.sysinfo:
             self.content.add(self.create_layout())
         else:
@@ -40,9 +41,7 @@ class Panel(ScreenPanel):
         self.cpu_count = int(self.sysinfo["cpu_info"]["cpu_count"])
         self.labels["cpu_usage"] = Gtk.Label(label="", xalign=0)
         self.grid.attach(self.labels["cpu_usage"], 0, self.current_row, 1, 1)
-        self.scales["cpu_usage"] = Gtk.ProgressBar(
-            hexpand=True, show_text=False, fraction=0
-        )
+        self.scales["cpu_usage"] = Gtk.ProgressBar(hexpand=True, show_text=False, fraction=0)
         self.grid.attach(self.scales["cpu_usage"], 1, self.current_row, 1, 1)
         self.current_row += 1
 
@@ -57,9 +56,7 @@ class Panel(ScreenPanel):
 
         self.labels["memory_usage"] = Gtk.Label(label="", xalign=0)
         self.grid.attach(self.labels["memory_usage"], 0, self.current_row, 1, 1)
-        self.scales["memory_usage"] = Gtk.ProgressBar(
-            hexpand=True, show_text=False, fraction=0
-        )
+        self.scales["memory_usage"] = Gtk.ProgressBar(hexpand=True, show_text=False, fraction=0)
         self.grid.attach(self.scales["memory_usage"], 1, self.current_row, 1, 1)
         self.current_row += 1
 
@@ -90,18 +87,23 @@ class Panel(ScreenPanel):
         self.current_row += 1
 
     def populate_info(self):
+        # date
         self.add_label_to_grid(self.prettify("date"), 0, bold=True)
         self.labels["date"] = Gtk.Label(label="", xalign=0)
         self.grid.attach(self.labels["date"], 1, self.current_row - 1, 1, 1)
+        self.add_label_to_grid("", 0)
+
+        # backend
+        self.add_label_to_grid(self.prettify("backend"), 0, bold=True)
+        self.labels["backend"] = Gtk.Label(label="", xalign=0)
+        self.grid.attach(self.labels["backend"], 1, self.current_row - 1, 1, 1)
         self.add_label_to_grid("", 0)
 
         for category, data in self.sysinfo.items():
             if category == "python":
                 self.add_label_to_grid(self.prettify(category), 0, bold=True)
                 self.current_row -= 1
-                self.add_label_to_grid(
-                    f'Version: {data["version_string"].split(" ")[0]}', 1
-                )
+                self.add_label_to_grid(f"Version: {data['version_string'].split(' ')[0]}", 1)
                 continue
 
             if (
@@ -133,18 +135,13 @@ class Panel(ScreenPanel):
                         for sub_key, sub_value in value.items():
                             if not sub_value:
                                 continue
-                            elif (
-                                isinstance(sub_value, list)
-                                and sub_key == "ip_addresses"
-                            ):
+                            elif isinstance(sub_value, list) and sub_key == "ip_addresses":
                                 for _ip in sub_value:
                                     self.add_label_to_grid(
                                         f"{_('IP Address')}: {_ip['address']}", 1
                                     )
                                 continue
-                            self.add_label_to_grid(
-                                f"{self.prettify(sub_key)}: {sub_value}", 1
-                            )
+                            self.add_label_to_grid(f"{self.prettify(sub_key)}: {sub_value}", 1)
                     else:
                         self.add_label_to_grid(f"{self.prettify(key)}: {value}", 1)
             # Add empty line
@@ -154,15 +151,11 @@ class Panel(ScreenPanel):
         if not self.sysinfo:
             return
         if action == "notify_proc_stat_update":
-            self.labels["cpu_usage"].set_label(
-                f'CPU: {data["system_cpu_usage"]["cpu"]:.0f}%'
-            )
-            self.scales["cpu_usage"].set_fraction(
-                float(data["system_cpu_usage"]["cpu"]) / 100
-            )
+            self.labels["cpu_usage"].set_label(f"CPU: {data['system_cpu_usage']['cpu']:.0f}%")
+            self.scales["cpu_usage"].set_fraction(float(data["system_cpu_usage"]["cpu"]) / 100)
             for i in range(self.cpu_count):
                 self.labels[f"cpu_usage_{i}"].set_label(
-                    f'CPU {i}: {data["system_cpu_usage"][f"cpu{i}"]:.0f}%'
+                    f"CPU {i}: {data['system_cpu_usage'][f'cpu{i}']:.0f}%"
                 )
                 self.scales[f"cpu_usage_{i}"].set_fraction(
                     float(data["system_cpu_usage"][f"cpu{i}"]) / 100
@@ -170,11 +163,12 @@ class Panel(ScreenPanel):
 
             self.labels["memory_usage"].set_label(
                 _("Memory")
-                + f': {(data["system_memory"]["used"] / data["system_memory"]["total"]) * 100:.0f}%'
+                + f": {(data['system_memory']['used'] / data['system_memory']['total']) * 100:.0f}%"
             )
             self.scales["memory_usage"].set_fraction(
-                float(data["system_memory"]["used"])
-                / float(data["system_memory"]["total"])
+                float(data["system_memory"]["used"]) / float(data["system_memory"]["total"])
             )
             now = datetime.datetime.now().astimezone()
             self.labels["date"].set_label(now.strftime("%a %b %e %H:%M:%S %Z %Y"))
+
+            self.labels["backend"].set_label(self.backend)

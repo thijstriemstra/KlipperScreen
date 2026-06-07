@@ -5,11 +5,11 @@ import gi
 
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Pango
+
 from ks_includes.screen_panel import ScreenPanel
 
 
 class Panel(ScreenPanel):
-
     def __init__(self, screen, title):
         super().__init__(screen, title)
         image = self._gtk.Image(
@@ -25,21 +25,15 @@ class Panel(ScreenPanel):
 
         self.labels["menu"] = self._gtk.Button("settings", _("Menu"), "color4")
         self.labels["menu"].connect("clicked", self._screen._go_to_submenu, "")
-        self.labels["restart"] = self._gtk.Button(
-            "refresh", _("Klipper Restart"), "color1"
-        )
+        self.labels["restart"] = self._gtk.Button("refresh", _("Klipper Restart"), "color1")
         self.labels["restart"].connect("clicked", self.restart_klipper)
         self.labels["firmware_restart"] = self._gtk.Button(
             "refresh", _("Firmware Restart"), "color2"
         )
         self.labels["firmware_restart"].connect("clicked", self.firmware_restart)
-        self.labels["restart_system"] = self._gtk.Button(
-            "refresh", _("System Restart"), "color1"
-        )
+        self.labels["restart_system"] = self._gtk.Button("refresh", _("System Restart"), "color1")
         self.labels["restart_system"].connect("clicked", self.reboot_poweroff, "reboot")
-        self.labels["shutdown"] = self._gtk.Button(
-            "shutdown", _("System Shutdown"), "color2"
-        )
+        self.labels["shutdown"] = self._gtk.Button("shutdown", _("System Shutdown"), "color2")
         self.labels["shutdown"].connect("clicked", self.reboot_poweroff, "shutdown")
         self.labels["retry"] = self._gtk.Button("load", _("Retry"), "color3")
         self.labels["retry"].connect("clicked", self.retry)
@@ -71,15 +65,14 @@ class Panel(ScreenPanel):
             self.labels["actions"].remove(child)
 
     def show_restart_buttons(self):
-
         self.clear_action_bar()
         if self.ks_printer_cfg is not None and self._screen._ws.connected:
             power_devices = self.ks_printer_cfg.get("power_devices", "")
-            if power_devices and self._printer.get_power_devices():
+            if power_devices and self._printer and self._printer.get_power_devices():
                 logging.info(f"Associated power devices: {power_devices}")
                 self.add_power_button(power_devices)
 
-        if self._screen.initialized:
+        if self._screen.state.initialized:
             self.labels["actions"].add(self.labels["restart"])
             self.labels["actions"].add(self.labels["firmware_restart"])
         else:
@@ -87,20 +80,15 @@ class Panel(ScreenPanel):
             self.labels["actions"].add(self.labels["shutdown"])
         self.labels["actions"].add(self.labels["menu"])
         if (
-            self._screen._ws
-            and not self._screen._ws.connecting
-            or self._screen.reinit_count > self._screen.max_retries
+            self._screen.state.reinit_count > self._screen.MAX_RETRIES
+            or self._screen.state.klippy_retry_count > self._screen.MAX_RETRIES
         ):
             self.labels["actions"].add(self.labels["retry"])
         self.labels["actions"].show_all()
 
     def add_power_button(self, powerdevs):
-        self.labels["power"] = self._gtk.Button(
-            "shutdown", _("Power On Printer"), "color3"
-        )
-        self.labels["power"].connect(
-            "clicked", self._screen.power_devices, powerdevs, True
-        )
+        self.labels["power"] = self._gtk.Button("shutdown", _("Power On Printer"), "color3")
+        self.labels["power"].connect("clicked", self._screen.power_devices, powerdevs, True)
         self.check_power_status()
         self.labels["actions"].add(self.labels["power"])
 
@@ -126,7 +114,9 @@ class Panel(ScreenPanel):
 
     def retry(self, widget):
         logging.debug("User retrying connection")
-        self._screen.connect_printer(self._screen.connecting_to_printer)
+        self._screen.state.reinit_count = 0
+        self._screen.state.klippy_retry_count = 0
+        self._screen._init_printer(_("Connecting to %s") % self._screen.state.printer_name)
         self.show_restart_buttons()
 
     def reboot_poweroff(self, widget, method):
